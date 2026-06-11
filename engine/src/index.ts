@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { createClient } from "redis";
 import { env } from "./utils/env.js";
+import { CreateOrderInput } from "./store/exchange-store.js";
 
 export type EngineCommandType =
   | "create_order"
@@ -67,7 +68,11 @@ function handleEngineRequest(message: EngineRequest): unknown {
    */
 
   // just checking the flow, remove this when you start implementing the logic
+
   if (message.type === "create_order") {
+    const payload = message.payload as any;
+    const { user, type, side, symbol, price, qty } = payload;
+
     return {
       orderId: crypto.randomUUID(),
       status: "filled",

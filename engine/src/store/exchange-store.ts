@@ -70,6 +70,7 @@ export interface DepthResponse {
 }
 
 export const BALANCES = new Map<string, Record<string, Balance>>();
-export const ORDERBOOKS = new Map<string, OrderBook>();
+export const ORDERBOOKS = new Map<string, OrderBook>(); 
 export const ORDERS = new Map<string, OrderRecord>();
+//here () signify new map is created same as new Map();
 export const FILLS: Fill[] = [];
