@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { BALANCES, ORDERBOOKS, ORDERS, FILLS} from "../store/exchange-store";
-import type { OrderRecord } from "../store/exchange-store";
+import type { OrderRecord, RestingOrder, DepthResponse, DepthLevel } from "../store/exchange-store";
 
 export function createOrder(payload: any) {
   const { userId, type, side, symbol, price, qty } = payload;
@@ -73,6 +73,7 @@ export function createOrder(payload: any) {
           createdAt: Date.now(),
         };
         fills.push(fill);
+        FILLS.push(fill);
         orderRecord.fills.push(fill)
         //update seller balance
         const sellerbalance = BALANCES.get(askOrder!.userId)!;
@@ -97,7 +98,7 @@ export function createOrder(payload: any) {
     for (const [bidPrice, bidOrders] of bids) {
       if (filledQty >= qty) break;
       if (price < bidPrice) break;
-      while (bidOrders.length > 0 && filledQty <= qty) {
+      while (bidOrders.length > 0 && filledQty < qty) {
         const bidOrder = bidOrders[0];
         const canFill = Math.min(qty - filledQty, bidOrder!.qty - bidOrder!.filledQty);
         bidOrder!!.filledQty += canFill;
@@ -108,16 +109,19 @@ export function createOrder(payload: any) {
           symbol,
           price: bidPrice,
           qty: canFill,
+          buyOrderId: bidOrder!.orderId,
+          sellOrderId: orderId,
           createdAt: Date.now(),
         };
         fills.push(fill);
+        FILLS.push(fill);
         const buyerBalance = BALANCES.get(bidOrder!.userId)!;
         buyerBalance.USD!.locked -= canFill * bidPrice;
         buyerBalance.BTC!.available += canFill;
         const sellerbalance = userBalance;
         sellerbalance.USD!.available += canFill * bidPrice;
         sellerbalance.BTC!.locked -= canFill
-        if (bidOrder!.filledQty == bidOrder!.qty) {
+        if (bidOrder!.filledQty === bidOrder!.qty) {
           bidOrder!.status = "filled";
           bidOrders.shift();
         } else {
@@ -126,5 +130,71 @@ export function createOrder(payload: any) {
         ORDERS.set(orderId, orderRecord);
       }
     }
+  }
+
+  orderRecord.filledQty = filledQty;
+  orderRecord.status = filledQty === qty ? "filled" : filledQty > 0 ? "partially_filled" : "open";
+  ORDERS.set(orderId, orderRecord);
+
+  const remainingQty = qty - filledQty;
+  if (remainingQty > 0 && price !== null) {
+    const restingOrder: RestingOrder = {
+      orderId,
+      userId,
+      side,
+      type: "limit",
+      symbol,
+      price,
+      qty,
+      filledQty,
+      status: orderRecord.status,
+      createdAt: orderRecord.createdAt,
+    };
+
+    const bookSide = side === "buy" ? orderbook.bids : orderbook.asks;
+    if (!bookSide.has(price)) {
+      bookSide.set(price, []);
+    }
+    bookSide.get(price)!.push(restingOrder);
+  }
+}
+
+export function getDepth(payload: any){
+  const { symbol } = payload;
+  if(ORDERBOOKS.has(symbol)){
+    const orderbook = ORDERBOOKS.get(symbol);
+    const bids: DepthLevel[] = []
+    for ( const [bidPrice, bidOrders] of orderbook!.bids.entries()){
+      let levelQty = 0;
+      for (const bidOrder of bidOrders){
+        levelQty += bidOrder.qty - bidOrder.filledQty;
+      }
+      bids.push({
+        price: bidPrice,
+        qty: levelQty
+      });
+    };
+    bids.sort((a,b)=>b.price-a.price)
+    const asks: DepthLevel[] = [];
+    for (const [askPrice, askOrders] of orderbook!.asks.entries()){
+      let levelQty = 0;
+      for(const  askOrder of askOrders){
+        levelQty += askOrder.qty - askOrder.filledQty;
+      }
+      asks.push({
+        price: askPrice,
+        qty: levelQty
+      });
+    };
+    asks.sort((a,b) => a.price-b.price);
+    const depth: DepthResponse = {
+      symbol,
+      bids,
+      asks
+    };
+    return depth;
+
+  }else{
+    throw new Error("symbol doesn't exist")
   }
 }
