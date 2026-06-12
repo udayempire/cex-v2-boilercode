@@ -199,3 +199,23 @@ export function getDepth(payload: any){
     throw new Error("symbol doesn't exist")
   }
 }
+
+export function getUserBalance(payload:{userId:string}){
+  const {userId} = payload;
+  if (!BALANCES.has(userId)) {
+    BALANCES.set(userId, {
+      BTC: { available: 100, locked: 0 },
+      USD: { available: 10000, locked: 0 },
+    });
+  };
+  const userBalance = BALANCES.get(userId)
+  return {userBalance};
+};
+
+export function getOrder(payload:{orderId:string}){
+  const {orderId} = payload;
+  if (!ORDERS.has(orderId)){
+    throw new Error ("order doesnt exist");
+  };
+  return ORDERS.get(orderId);
+};

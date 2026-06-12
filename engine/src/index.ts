@@ -2,7 +2,7 @@ import "dotenv/config";
 import { createClient } from "redis";
 import { env } from "./utils/env.js";
 import type { CreateOrderInput } from "./store/exchange-store.js";
-import { createOrder } from "./services/order-service.js";
+import { createOrder, getDepth, getOrder, getUserBalance } from "./services/order-service.js";
 
 export type EngineCommandType =
   | "create_order"
@@ -23,6 +23,10 @@ export interface EngineResponse {
   ok: boolean;
   data?: unknown;
   error?: string;
+}
+
+type getDepthPayload = {
+  symbol: string
 }
 
 const brokerClient = createClient({ url: env.redisUrl }).on("error", (error) => {
@@ -71,7 +75,7 @@ function handleEngineRequest(message: EngineRequest): unknown {
   // just checking the flow, remove this when you start implementing the logic
 
   if (message.type === "create_order") {
-    const payload:CreateOrderInput = message.payload as any;
+    const payload: CreateOrderInput = message.payload as any;
     const { userId, type, side, symbol, price, qty } = payload;
     const order = createOrder(payload);
 
@@ -93,13 +97,36 @@ function handleEngineRequest(message: EngineRequest): unknown {
       // ],
       // note: "Smoke-test response only. Students must replace this with real matching logic.",
     };
+    // throw new Error("TODO(student): implement this engine request type");
   }
-  throw new Error("TODO(student): implement this engine request type");
+  if (message.type === "get_depth") {
+    const payload = message.payload as getDepthPayload;
+    const depthLevel = getDepth(payload);
+    return {
+      symbol: depthLevel.symbol,
+      asks: depthLevel.asks,
+      bids: depthLevel.bids
+    };
+  };
+  if (message.type === "get_user_balance"){
+    const {userId}= (message.payload as {userId: string});
+    const userBalance = getUserBalance({userId})
+    return {
+      userBalance
+    };
+  };
+  if (message.type === "get_order"){
+    const orderId = message.payload as any;
+    const orderDetails = getOrder({orderId});
+    return {
+      orderDetails
+    }
+  }
 }
 
 console.log(`Engine listening on Redis queue: ${env.incomingQueue}`);
 
-for (;;) {
+for (; ;) {
   const item = await brokerClient.brPop(env.incomingQueue, 0);
   if (!item) continue;
 
@@ -125,5 +152,5 @@ for (;;) {
       ok: false,
       error: error instanceof Error ? error.message : "engine_error",
     });
-  }
+  };
 }
