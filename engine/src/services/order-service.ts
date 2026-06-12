@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { BALANCES, ORDERBOOKS, ORDERS, FILLS} from "../store/exchange-store";
-import type { OrderRecord, RestingOrder, DepthResponse, DepthLevel } from "../store/exchange-store";
+import type { OrderRecord, RestingOrder, DepthResponse, DepthLevel, Fill } from "../store/exchange-store";
 
 export function createOrder(payload: any) {
   const { userId, type, side, symbol, price, qty } = payload;
@@ -41,7 +41,7 @@ export function createOrder(payload: any) {
     qty,
     filledQty: 0,
     status: "open",
-    fills: [],  // Empty for now
+    fills : [],  // Empty for now
     createdAt: Date.now(),
   }
 
@@ -157,6 +157,7 @@ export function createOrder(payload: any) {
     }
     bookSide.get(price)!.push(restingOrder);
   }
+  return orderRecord;
 }
 
 export function getDepth(payload: any){

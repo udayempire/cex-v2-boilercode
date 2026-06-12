@@ -1,7 +1,8 @@
 import "dotenv/config";
 import { createClient } from "redis";
 import { env } from "./utils/env.js";
-import { CreateOrderInput } from "./store/exchange-store.js";
+import type { CreateOrderInput } from "./store/exchange-store.js";
+import { createOrder } from "./services/order-service.js";
 
 export type EngineCommandType =
   | "create_order"
@@ -70,28 +71,29 @@ function handleEngineRequest(message: EngineRequest): unknown {
   // just checking the flow, remove this when you start implementing the logic
 
   if (message.type === "create_order") {
-    const payload = message.payload as any;
-    const { user, type, side, symbol, price, qty } = payload;
+    const payload:CreateOrderInput = message.payload as any;
+    const { userId, type, side, symbol, price, qty } = payload;
+    const order = createOrder(payload);
 
     return {
-      orderId: crypto.randomUUID(),
-      status: "filled",
-      filledQty: DUMMY_SELL_ORDER.qty,
-      averagePrice: DUMMY_SELL_ORDER.price,
-      fills: [
-        {
-          fillId: crypto.randomUUID(),
-          symbol: DUMMY_SELL_ORDER.symbol,
-          price: DUMMY_SELL_ORDER.price,
-          qty: DUMMY_SELL_ORDER.qty,
-          buyOrderId: "request-buy-order",
-          sellOrderId: DUMMY_SELL_ORDER.orderId,
-        },
-      ],
-      note: "Smoke-test response only. Students must replace this with real matching logic.",
+      orderId: order.orderId,
+      status: order.status,
+      filledQty: order.filledQty,
+      averagePrice: order.price,
+      fills: order.fills
+      // fills: [
+      //   {
+      //     fillId: order.fills.fillId,
+      //     symbol: DUMMY_SELL_ORDER.symbol,
+      //     price: DUMMY_SELL_ORDER.price,
+      //     qty: DUMMY_SELL_ORDER.qty,
+      //     buyOrderId: "request-buy-order",
+      //     sellOrderId: DUMMY_SELL_ORDER.orderId,
+      //   },
+      // ],
+      // note: "Smoke-test response only. Students must replace this with real matching logic.",
     };
   }
-
   throw new Error("TODO(student): implement this engine request type");
 }
 
